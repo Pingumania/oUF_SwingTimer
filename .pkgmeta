@@ -1,0 +1,4 @@
+package-as: oUF_SwingTimer
+
+ignore:
+  - README.md

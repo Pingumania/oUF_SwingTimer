@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: oUF SwingTimer
+## Notes: Auto attack swing timer element for oUF
+## Author: Pingumania
+## Version: @project-version@
+## Category: User Interface
+## Dependencies: oUF
+
+oUF_SwingTimer.lua
