@@ -76,7 +76,7 @@ local BAR_KEYS = {
 
 local function UpdateBar(bar, attackSpeed)
 	if bar then
-		bar:SetShown(attackSpeed ~= nil and attackSpeed > 0)
+		bar:SetShown(issecretvalue(attackSpeed) or (attackSpeed ~= nil and attackSpeed > 0))
 	end
 end
 
