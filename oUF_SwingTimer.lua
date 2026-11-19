@@ -28,11 +28,15 @@ Only available for the `player` unit, and only in WoW Forever.
 
 A StatusBar is shown while the player can attack with the matching weapon, and hidden otherwise.
 
+The default Blizzard swing timer is hidden while the element is enabled.
+
 A default texture will be applied to the StatusBar widgets if they don't have a texture or a color set.
 
 ## Options
 
-.smoothing - Which status bar smoothing method to use, defaults to `Enum.StatusBarInterpolation.Immediate` (number)
+.smoothing  - Which status bar smoothing method to use, defaults to `Enum.StatusBarInterpolation.Immediate` (number)
+.direction  - Which direction the bars move, defaults to `Enum.StatusBarTimerDirection.ElapsedTime` (number)
+.checkRange - Hide a StatusBar while the target is out of range for its swing type (bool?)
 
 ## Examples
 
@@ -76,7 +80,8 @@ local BAR_KEYS = {
 
 local function UpdateBar(bar, attackSpeed)
 	if bar then
-		bar:SetShown(issecretvalue(attackSpeed) or (attackSpeed ~= nil and attackSpeed > 0))
+		bar.hasWeapon = issecretvalue(attackSpeed) or (attackSpeed ~= nil and attackSpeed > 0)
+		bar:SetShown(bar.hasWeapon and bar.inRange)
 	end
 end
 
@@ -131,7 +136,7 @@ local function Swing(self, event, swingDuration, swingType)
 	end
 
 	bar.duration:SetTimeFromStart(GetTime(), swingDuration)
-	bar:SetTimerDuration(bar.duration, element.smoothing, Enum.StatusBarTimerDirection.ElapsedTime)
+	bar:SetTimerDuration(bar.duration, element.smoothing, element.direction)
 
 	if bar.Time then
 		bar.Time.binding:SetDuration(bar.duration)
@@ -148,6 +153,18 @@ local function Swing(self, event, swingDuration, swingType)
 	if element.PostSwing then
 		return element:PostSwing(bar, swingType, swingDuration)
 	end
+end
+
+local function SwingRange(self, event, swingType, isInRange, checksRange)
+	local key = BAR_KEYS[swingType]
+	local bar = key and self.SwingTimer[key]
+
+	if not bar then
+		return
+	end
+
+	bar.inRange = not checksRange or isInRange ~= false
+	bar:SetShown(bar.hasWeapon and bar.inRange)
 end
 
 local function ForceUpdate(element)
@@ -168,12 +185,18 @@ local function Enable(self, unit)
 		element.smoothing = Enum.StatusBarInterpolation.Immediate
 	end
 
+	if not element.direction then
+		element.direction = Enum.StatusBarTimerDirection.ElapsedTime
+	end
+
 	local bar, time
 
-	for _, key in next, BAR_KEYS do
+	for swingType, key in next, BAR_KEYS do
 		bar = element[key]
 
 		if bar then
+			bar.inRange = true
+			C_SwingTimer.EnableRangeCheck(swingType, not not element.checkRange)
 			time = bar.Time
 
 			if time then
@@ -200,6 +223,12 @@ local function Enable(self, unit)
 	self:RegisterEvent("WEAPON_SLOT_CHANGED", Path, true)
 	self:RegisterEvent("UNIT_ATTACK_SPEED", Path)
 
+	if element.checkRange then
+		self:RegisterEvent("PLAYER_SWING_RANGE_UPDATE", SwingRange, true)
+	end
+
+	C_CVar.SetTempCVar("showSwingTimer", "0")
+
 	return true
 end
 
@@ -212,11 +241,12 @@ local function Disable(self)
 
 	local bar
 
-	for _, key in next, BAR_KEYS do
+	for swingType, key in next, BAR_KEYS do
 		bar = element[key]
 
 		if bar then
 			bar:Hide()
+			C_SwingTimer.EnableRangeCheck(swingType, false)
 
 			if bar.Time then
 				bar.Time.binding:SetEnabled(false)
@@ -227,6 +257,9 @@ local function Disable(self)
 	self:UnregisterEvent("PLAYER_SWING", Swing)
 	self:UnregisterEvent("WEAPON_SLOT_CHANGED", Path)
 	self:UnregisterEvent("UNIT_ATTACK_SPEED", Path)
+	self:UnregisterEvent("PLAYER_SWING_RANGE_UPDATE", SwingRange)
+
+	C_CVar.RemoveTempCVar("showSwingTimer")
 end
 
 oUF:AddElement("SwingTimer", Path, Enable, Disable)
